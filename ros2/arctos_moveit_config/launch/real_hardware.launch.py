@@ -153,6 +153,7 @@ def generate_launch_description():
             "can_bitrate": 500000,
             "coupled_axis_mode": True,
             "state_publish_rate": 5.0,
+            "command_send_rate": 50.0,
             "command_timeout": 2.0,
             "active_joints": [1, 2, 3, 4],
         }],

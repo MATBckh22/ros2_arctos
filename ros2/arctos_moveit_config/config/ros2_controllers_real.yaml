@@ -3,7 +3,7 @@
 # Run can_timing_audit.py to determine the optimal rate for your setup.
 controller_manager:
   ros__parameters:
-    update_rate: 5  # Hz — matches CAN bridge state_publish_rate
+    update_rate: 50  # Hz — higher trajectory interpolation rate for smoother joint1 motion
 
     arctos_arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController

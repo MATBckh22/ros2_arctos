@@ -64,12 +64,13 @@ class ArctosConfig:
     default_speed_rpm: int = 500
     default_acceleration: int = 150
     default_joint_speeds_rpm: List[int] = field(
-        default_factory=lambda: [200, 500, 500, 500, 500, 500]
+        default_factory=lambda: [120, 500, 500, 500, 500, 500]
     )
     default_joint_accelerations: List[int] = field(
-        default_factory=lambda: [80, 150, 150, 150, 150, 150]
+        default_factory=lambda: [40, 150, 150, 150, 150, 150]
     )
     command_spacing_s: float = 0.02
+    command_spacing_no_ack_s: float = 0.002
     command_retry_delay_s: float = 0.05
     read_spacing_s: float = 0.005
     
@@ -527,7 +528,7 @@ class ArctosController:
                     accelerations[i],
                     wait_for_ack=False,
                 )
-                time.sleep(self.config.command_spacing_s)
+                time.sleep(self.config.command_spacing_no_ack_s)
 
             self._commanded_positions = list(positions)
 

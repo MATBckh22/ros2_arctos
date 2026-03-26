@@ -25,7 +25,8 @@
     <xacro:macro name="arctos_urdf_ros2_control" params="name initial_positions_file
         hardware_plugin:=mock_components/GenericSystem
         joint_commands_topic:=''
-        joint_states_topic:=''">
+        joint_states_topic:=''
+        trigger_joint_command_threshold:='-1.0'">
         <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
         <ros2_control name="${name}" type="system">
@@ -35,6 +36,7 @@
                 <param name="state_following_offset">0.0</param>
                 <param name="joint_commands_topic">${joint_commands_topic}</param>
                 <param name="joint_states_topic">${joint_states_topic}</param>
+                <param name="trigger_joint_command_threshold">${trigger_joint_command_threshold}</param>
             </hardware>
             <joint name="joint1">
                 <command_interface name="position"/>

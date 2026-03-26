@@ -76,6 +76,7 @@ class ArctosCanBridge(Node):
         self.declare_parameter('can_bitrate', 500000)
         self.declare_parameter('coupled_axis_mode', True)
         self.declare_parameter('state_publish_rate', 5.0)
+        self.declare_parameter('command_send_rate', 10.0)
         self.declare_parameter('command_timeout', 0.5)
         self.declare_parameter('active_joints', [1, 2, 3, 4])
         self.declare_parameter('state_joint_signs', [1.0, 1.0, -1.0, 1.0, 1.0, 1.0])
@@ -84,6 +85,7 @@ class ArctosCanBridge(Node):
         can_bitrate = self.get_parameter('can_bitrate').value
         coupled_mode = self.get_parameter('coupled_axis_mode').value
         self._state_rate = self.get_parameter('state_publish_rate').value
+        self._command_rate = self.get_parameter('command_send_rate').value
         self._cmd_timeout = self.get_parameter('command_timeout').value
         active_joints_param = self.get_parameter('active_joints').value
         state_joint_signs = self.get_parameter('state_joint_signs').value
@@ -102,6 +104,7 @@ class ArctosCanBridge(Node):
         self._lock = threading.Lock()
         self._last_cmd_time = 0.0
         self._last_cmd_positions = [0.0] * 6
+        self._last_sent_cmd_positions = [0.0] * 6
         self._last_known_positions = [0.0] * 6  # Fallback for failed reads
         self._pending_cmd = None
         self._motors_enabled = False
@@ -164,6 +167,7 @@ class ArctosCanBridge(Node):
         self.get_logger().info(
             f'Arctos CAN Bridge starting on {can_device}, '
             f'state rate={self._state_rate} Hz, '
+            f'command rate={self._command_rate} Hz, '
             f'active joints={[i+1 for i in self._active_indices]}'
         )
 
@@ -177,6 +181,7 @@ class ArctosCanBridge(Node):
 
         positions = self.controller.read_joint_positions()
         self._last_cmd_positions = list(positions)
+        self._last_sent_cmd_positions = list(positions)
         self._last_known_positions = list(positions)
         self._last_cmd_time = time.monotonic()
         self.get_logger().info(
@@ -184,8 +189,12 @@ class ArctosCanBridge(Node):
             f'{[f"{math.degrees(p):.1f}" for p in positions]}'
         )
 
-        self._control_timer = self.create_timer(
-            1.0 / self._state_rate, self._control_loop,
+        self._state_timer = self.create_timer(
+            1.0 / self._state_rate, self._state_loop,
+            callback_group=self._timer_cb_group,
+        )
+        self._command_timer = self.create_timer(
+            1.0 / self._command_rate, self._command_loop,
             callback_group=self._timer_cb_group,
         )
         self._watchdog_timer = self.create_timer(
@@ -270,20 +279,17 @@ class ArctosCanBridge(Node):
                 corrected[i] *= sign
         return corrected
 
-    def _control_loop(self):
-        """Unified control loop: read state first, then send pending command."""
-        # Skip CAN I/O when control is paused (e.g. during homing)
+    def _state_loop(self):
+        """Read and publish state at a conservative CAN-safe rate."""
         if self._control_paused:
             return
 
-        # 1) Flush any stale ACKs from the previous write phase before reads.
         try:
             self.controller.can.flush()
         except Exception:
             pass
         time.sleep(0.005)
 
-        # 2) Read and publish state (sequential reads, active joints only).
         try:
             positions = self._read_positions_sequential()
             ros_positions = self._positions_for_ros_state(positions)
@@ -299,17 +305,30 @@ class ArctosCanBridge(Node):
         except Exception as e:
             self.get_logger().warn(f'Failed to read joint positions: {e}')
 
-        # 3) Let the bus settle before issuing a burst of position commands.
-        time.sleep(0.005)
+    def _command_loop(self):
+        """Send the latest trajectory command at a smoother rate than state reads."""
+        if self._control_paused or not self._motors_enabled:
+            return
 
         with self._lock:
             cmd = self._pending_cmd
             self._pending_cmd = None
 
-        if cmd is not None and self._motors_enabled:
+        if cmd is None:
+            return
+
+        if all(abs(a - b) < 1e-6 for a, b in zip(cmd, self._last_sent_cmd_positions)):
+            return
+
+        time.sleep(0.005)
+
+        try:
             self.controller.move_to_positions_no_wait(cmd, validate=False)
             with self._lock:
                 self._last_cmd_positions = cmd
+                self._last_sent_cmd_positions = list(cmd)
+        except Exception as e:
+            self.get_logger().warn(f'Failed to send joint command: {e}')
 
     def _check_watchdog(self):
         """Disable motors if no command received within timeout."""

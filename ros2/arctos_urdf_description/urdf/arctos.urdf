@@ -8,6 +8,7 @@
     <xacro:arg name="joint_commands_topic" default=""/>
     <xacro:arg name="joint_states_topic" default=""/>
     <xacro:arg name="fake_sensor_commands" default="true"/>
+    <xacro:arg name="trigger_joint_command_threshold" default="-1.0"/>
     <xacro:arg name="mujoco_model" default=""/>
     <material name="silver_default">
         <color rgba="0.700 0.700 0.700 1.000" />
@@ -526,6 +527,7 @@
             <param name="state_following_offset">0.0</param>
             <param name="joint_commands_topic">$(arg joint_commands_topic)</param>
             <param name="joint_states_topic">$(arg joint_states_topic)</param>
+            <param name="trigger_joint_command_threshold">$(arg trigger_joint_command_threshold)</param>
             <param name="mujoco_model">$(arg mujoco_model)</param>
         </hardware>
         <joint name="joint1">
