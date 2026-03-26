@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot name="arctos_urdf">
+    <group name="arctos_arm">
+        <chain base_link="base_link" tip_link="Link_4_tool_1"/>
+    </group>
+    <group name="real_hw_tool">
+        <link name="Link_4_tool_1"/>
+    </group>
+    <group name="gripper">
+        <joint name="jaw1"/>
+        <joint name="jaw2"/>
+    </group>
+    <group_state name="home" group="arctos_arm">
+        <joint name="joint1" value="0"/>
+        <joint name="joint2" value="0"/>
+        <joint name="joint3" value="0"/>
+        <joint name="joint4" value="0"/>
+    </group_state>
+    <group_state name="ready" group="arctos_arm">
+        <joint name="joint1" value="0"/>
+        <joint name="joint2" value="0"/>
+        <joint name="joint3" value="0"/>
+        <joint name="joint4" value="0"/>
+    </group_state>
+    <group_state name="gripper_open" group="gripper">
+        <joint name="jaw1" value="0"/>
+        <joint name="jaw2" value="0"/>
+    </group_state>
+    <group_state name="gripper_closed" group="gripper">
+        <joint name="jaw1" value="0.015"/>
+        <joint name="jaw2" value="0.015"/>
+    </group_state>
+    <end_effector name="real_hw_tool" parent_link="Link_4_tool_1" group="real_hw_tool" parent_group="arctos_arm"/>
+    <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="base_link"/>
+    <disable_collisions link1="Gripper_1" link2="Left_jaw_1" reason="Adjacent"/>
+    <disable_collisions link1="Gripper_1" link2="Link_3_1" reason="Never"/>
+    <disable_collisions link1="Gripper_1" link2="Link_5_1" reason="Never"/>
+    <disable_collisions link1="Gripper_1" link2="Link_6_1" reason="Adjacent"/>
+    <disable_collisions link1="Gripper_1" link2="Right_jaw_1" reason="Adjacent"/>
+    <disable_collisions link1="Left_jaw_1" link2="Link_3_1" reason="Never"/>
+    <disable_collisions link1="Left_jaw_1" link2="Link_5_1" reason="Never"/>
+    <disable_collisions link1="Left_jaw_1" link2="Link_6_1" reason="Never"/>
+    <disable_collisions link1="Left_jaw_1" link2="Right_jaw_1" reason="Never"/>
+    <disable_collisions link1="Link_1_1" link2="Link_2_1" reason="Adjacent"/>
+    <disable_collisions link1="Link_1_1" link2="base_link" reason="Adjacent"/>
+    <disable_collisions link1="Link_2_1" link2="Link_3_1" reason="Adjacent"/>
+    <disable_collisions link1="Link_3_1" link2="Link_4_1" reason="Adjacent"/>
+    <disable_collisions link1="Link_3_1" link2="Link_5_1" reason="Never"/>
+    <disable_collisions link1="Link_3_1" link2="Link_6_1" reason="Never"/>
+    <disable_collisions link1="Link_3_1" link2="Right_jaw_1" reason="Never"/>
+    <disable_collisions link1="Link_4_1" link2="Link_5_1" reason="Adjacent"/>
+    <disable_collisions link1="Link_5_1" link2="Link_6_1" reason="Adjacent"/>
+    <disable_collisions link1="Link_5_1" link2="Right_jaw_1" reason="Never"/>
+    <disable_collisions link1="Link_6_1" link2="Right_jaw_1" reason="Never"/>
+</robot>

@@ -1,0 +1,60 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="paper_test">
+  <compiler angle="radian" autolimits="true"/>
+
+  <option timestep="0.001" gravity="0 0 -9.81">
+    <flag multiccd="enable"/>
+  </option>
+
+  <visual>
+    <headlight ambient="0.3 0.3 0.3"/>
+    <quality shadowsize="4096"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="145" elevation="-25"/>
+  </visual>
+
+  <statistic center="0.4 0 0.35" extent="1.0"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0"
+             width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" width="300" height="300"
+             rgb1="0.3 0.3 0.3" rgb2="0.4 0.4 0.4"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5"
+              reflectance="0.2"/>
+    <material name="paper_white" rgba="0.95 0.93 0.88 1" specular="0.1" shininess="0.05"/>
+    <material name="table_wood" rgba="0.6 0.45 0.3 1" specular="0.3" shininess="0.3"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <light pos="1 1 1.5" dir="-0.5 -0.5 -1" diffuse="0.4 0.4 0.4"/>
+    <geom name="ground" type="plane" size="2 2 0.01" material="groundplane"/>
+
+    <!-- Table -->
+    <body name="table" pos="0.4 0 0.35">
+      <geom type="box" size="0.3 0.2 0.01" material="table_wood" mass="50"
+            friction="0.8 0.005 0.0001" solref="0.001 1"/>
+      <geom type="cylinder" size="0.02 0.17" pos="-0.25 -0.15 -0.18" material="table_wood"/>
+      <geom type="cylinder" size="0.02 0.17" pos="0.25 -0.15 -0.18" material="table_wood"/>
+      <geom type="cylinder" size="0.02 0.17" pos="-0.25 0.15 -0.18" material="table_wood"/>
+      <geom type="cylinder" size="0.02 0.17" pos="0.25 0.15 -0.18" material="table_wood"/>
+    </body>
+
+    <!-- Paper sheet (~220mm x 300mm) on the table -->
+    <flexcomp name="paper" type="grid" count="22 30 1" spacing="0.01 0.01 0.01"
+              pos="0.4 0 0.365" mass="0.005" radius="0.001" material="paper_white"
+              dim="2">
+      <contact condim="3" solref="0.001 1" solimp="0.95 0.99 0.001"
+               friction="0.5 0.005 0.0001"/>
+      <edge damping="0.1" equality="true"/>
+      <elasticity young="50000" poisson="0.3" thickness="0.0003"/>
+    </flexcomp>
+
+    <!-- A pushable box you can interact with -->
+    <body name="red_box" pos="0.25 0 0.40">
+      <freejoint/>
+      <geom type="box" size="0.025 0.025 0.025" rgba="0.85 0.15 0.15 1" mass="0.1"/>
+    </body>
+  </worldbody>
+</mujoco>

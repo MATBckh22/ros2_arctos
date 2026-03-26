@@ -1,0 +1,128 @@
+# Arctos Hardware Configuration
+# Configuration for the Arctos robot arm hardware interface
+
+arctos_hardware_node:
+  ros__parameters:
+    # CAN Bus Configuration
+    can_device: "can0"  # Linux socketcan interface (or override with /dev/ttyACM0)
+    can_bitrate: 500000          # CAN bus bitrate (500 kbps)
+    
+    # Publishing
+    publish_rate: 50.0           # Joint state publish rate (Hz)
+    
+    # Motor Configuration
+    coupled_axis_mode: true      # Enable differential wrist coupling (J5/J6)
+    auto_enable: true            # Auto-enable motors on startup
+    
+    # Safety Limits
+    max_velocity: 1.0            # Maximum joint velocity (rad/s)
+    max_acceleration: 2.0        # Maximum joint acceleration (rad/s²)
+    
+    # Timeouts
+    command_timeout: 0.5         # Command timeout before stopping (seconds)
+    homing_timeout: 60.0         # Homing operation timeout (seconds)
+    
+    # Motor CAN IDs (1-indexed motor numbers)
+    motor_ids:
+      joint1: 1
+      joint2: 2
+      joint3: 3
+      joint4: 4
+      joint5: 5  # Motor B (wrist differential)
+      joint6: 6  # Motor C (wrist differential)
+    
+    # Gear Ratios (motor revolutions per joint revolution)
+    gear_ratios:
+      joint1: 13.5
+      joint2: 150.0
+      joint3: 150.0
+      joint4: 48.0
+      joint5: 27.3375
+      joint6: 10.0
+    
+    # Joint Limits (radians)
+    joint_limits:
+      joint1:
+        min: -3.14159
+        max: 3.14159
+      joint2:
+        min: -1.5708
+        max: 1.5708
+      joint3:
+        min: -1.5708
+        max: 1.5708
+      joint4:
+        min: -3.14159
+        max: 3.14159
+      joint5:
+        min: -1.5708
+        max: 1.5708
+      joint6:
+        min: -3.14159
+        max: 3.14159
+    
+    # Homing Configuration
+    homing:
+      # Microstep settings
+      microsteps: 16              # MKS SERVO microstepping (16 divisions per step)
+      encoder_resolution: 16384   # Encoder PPR (pulses per revolution)
+      
+      # Homing speeds (RPM)
+      homing_speed: 300           # Speed when approaching limit switch
+      backup_speed: 100           # Slower speed when backing off limit switch
+      backup_distance_deg: 5.0    # Distance to backup from limit switch (degrees)
+      
+      # Acceleration settings
+      acceleration: 50            # Acceleration/deceleration (RPM/s)
+      
+      # Homing current threshold (mA) - for stall detection
+      current_threshold: 800
+      
+      # End stop configuration
+      endstop_level: 0            # 0 = LOW active, 1 = HIGH active (limit switch trigger level)
+      
+      # Pre-homing limit check
+      check_limits_before_homing: true   # Check if already at limit before starting
+      
+      # Homing direction per joint (1 = positive/CW, -1 = negative/CCW)
+      directions:
+        joint1: -1
+        joint2: -1
+        joint3: -1
+        joint4: -1
+        joint5: 1
+        joint6: 1
+      
+      # Joint homing order (safety sequence: wrist first, then elbow, shoulder, base)
+      order: [5, 6, 4, 3, 2, 1]
+      
+      # Differential wrist homing
+      wrist_differential:
+        enabled: true             # Enable coupled B/C motor homing for J5/J6
+        motor_b_id: 5             # Motor B CAN ID
+        motor_c_id: 6             # Motor C CAN ID
+        alternating: true         # Use alternating pattern for precise homing
+    
+    # Motor Parameters (MKS SERVO specific)
+    motor_params:
+      # Encoder resolution
+      encoder_resolution: 16384
+      
+      # Motor types
+      types:
+        joint1: "SERVO57D"
+        joint2: "SERVO57D"
+        joint3: "SERVO57D"
+        joint4: "SERVO57D"
+        joint5: "SERVO42D"
+        joint6: "SERVO42D"
+      
+      # Operating mode (0=position, 1=velocity, 2=torque)
+      mode: 0
+      
+      # Microstepping (for position accuracy)
+      microsteps: 16
+      
+      # Motor currents (mA)
+      holding_current: 200        # Current when holding position
+      running_current: 800        # Current during motion

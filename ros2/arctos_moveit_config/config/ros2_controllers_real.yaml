@@ -1,0 +1,43 @@
+# ros2_control config for real hardware via CAN bridge.
+# Uses a lower update rate than simulation to match CAN bus bandwidth.
+# Run can_timing_audit.py to determine the optimal rate for your setup.
+controller_manager:
+  ros__parameters:
+    update_rate: 5  # Hz — matches CAN bridge state_publish_rate
+
+    arctos_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+arctos_arm_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+
+gripper_controller:
+  ros__parameters:
+    joints:
+      - jaw1
+      - jaw2
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true

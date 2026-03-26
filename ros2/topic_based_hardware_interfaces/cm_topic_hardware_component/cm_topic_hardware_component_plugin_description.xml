@@ -1,0 +1,11 @@
+<library path="cm_topic_hardware_component">
+  <class
+    name="cm_topic_hardware_component/CMTopicSystem"
+    type="cm_topic_hardware_component::CMTopicSystem"
+    base_class_type="hardware_interface::SystemInterface"
+  >
+    <description>
+      A ros2_control hardware component that uses pal_statistics messages published by the controller_manager for introspection.
+    </description>
+  </class>
+</library>

@@ -1,0 +1,10 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: arctos_urdf_description
+    relative_path: urdf/arctos.urdf
+  srdf:
+    relative_path: config/arctos_urdf.srdf
+  package_settings:
+    author_name: Chong Kar Hing
+    author_email: ckhing220303@gmail.com
+    generated_timestamp: 1766912152
