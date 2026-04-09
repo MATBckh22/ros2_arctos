@@ -130,23 +130,23 @@
   </collision>
 </link>
 
-<link name="Gripper_1">
+<link name="C_Core_Suction">
   <inertial>
     <origin xyz="0.0036112727264542635 -0.014760653808445767 -0.00103677815369696" rpy="0 0 0"/>
     <mass value="0.5810486809925093"/>
     <inertia ixx="0.000385" iyy="0.000495" izz="0.000263" ixy="1e-05" iyz="-2e-06" ixz="3e-06"/>
   </inertial>
   <visual>
-    <origin xyz="-0.000193 0.319847 -0.570316" rpy="0 0 0"/>
+    <origin xyz="-0.000429 -0.008602 -0.624470" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="package://arctos_urdf_description/meshes/Gripper_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://arctos_urdf_description/meshes/C Core Suction.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="paint_metallic_blue_2"/>
   </visual>
   <collision>
-    <origin xyz="-0.000193 0.319847 -0.570316" rpy="0 0 0"/>
+    <origin xyz="-0.000429 -0.008602 -0.624470" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="package://arctos_urdf_description/meshes/Gripper_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://arctos_urdf_description/meshes/C Core Suction.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -172,47 +172,6 @@
   </collision>
 </link>
 
-<link name="Left_jaw_1">
-  <inertial>
-    <origin xyz="-0.011142702480351952 -0.009692440309284511 -0.009385792627785827" rpy="0 0 0"/>
-    <mass value="0.07369602565859415"/>
-    <inertia ixx="1.1e-05" iyy="6e-06" izz="1.4e-05" ixy="2e-06" iyz="-0.0" ixz="-0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="-0.007934 0.359845 -0.599867" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://arctos_urdf_description/meshes/Left_jaw_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="paint_metallic_blue_2"/>
-  </visual>
-  <collision>
-    <origin xyz="-0.007934 0.359845 -0.599867" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://arctos_urdf_description/meshes/Left_jaw_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
-<link name="Right_jaw_1">
-  <inertial>
-    <origin xyz="-0.008289104952972526 -0.009768535307719373 0.009395511902715814" rpy="0 0 0"/>
-    <mass value="0.07312902168719511"/>
-    <inertia ixx="1.1e-05" iyy="6e-06" izz="1.4e-05" ixy="-1e-06" iyz="0.0" ixz="-1e-06"/>
-  </inertial>
-  <visual>
-    <origin xyz="-0.007934 0.359845 -0.539867" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://arctos_urdf_description/meshes/Right_jaw_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="paint_metallic_blue_2"/>
-  </visual>
-  <collision>
-    <origin xyz="-0.007934 0.359845 -0.539867" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://arctos_urdf_description/meshes/Right_jaw_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
 
 <joint name="joint1" type="continuous">
   <origin xyz="0.0 0.000529 0.111" rpy="0 0 0"/>
@@ -242,40 +201,26 @@
   <axis xyz="-0.0 1.0 -0.0"/>
 </joint>
 
-<joint name="joint5" type="continuous">
+<joint name="joint5" type="revolute">
   <origin xyz="-0.039012 -0.121187 -0.001774" rpy="0 0 0"/>
   <parent link="Link_4_1"/>
   <child link="Link_5_1"/>
   <axis xyz="-1.0 -0.0 0.0"/>
+  <limit lower="-1.57079632679" upper="1.57079632679" effort="100" velocity="2.0"/>
 </joint>
 
-<joint name="gripper" type="fixed">
+<joint name="suction_tool" type="fixed">
   <origin xyz="0.0 -0.006085 0.0" rpy="0 0 0"/>
   <parent link="Link_6_1"/>
-  <child link="Gripper_1"/>
+  <child link="C_Core_Suction"/>
 </joint>
 
-<joint name="joint6" type="continuous">
+<joint name="joint6" type="revolute">
   <origin xyz="0.039204 -0.033835 0.0" rpy="0 0 0"/>
   <parent link="Link_5_1"/>
   <child link="Link_6_1"/>
   <axis xyz="-0.0 1.0 -0.0"/>
-</joint>
-
-<joint name="jaw1" type="prismatic">
-  <origin xyz="0.007741 -0.039998 0.029551" rpy="0 0 0"/>
-  <parent link="Gripper_1"/>
-  <child link="Left_jaw_1"/>
-  <axis xyz="-0.0 0.0 -1.0"/>
-  <limit upper="0.015" lower="0.0" effort="100" velocity="100"/>
-</joint>
-
-<joint name="jaw2" type="prismatic">
-  <origin xyz="0.007741 -0.039998 -0.030449" rpy="0 0 0"/>
-  <parent link="Gripper_1"/>
-  <child link="Right_jaw_1"/>
-  <axis xyz="0.0 -0.0 1.0"/>
-  <limit upper="0.015" lower="0.0" effort="100" velocity="100"/>
+  <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="2.0"/>
 </joint>
 
 </robot>

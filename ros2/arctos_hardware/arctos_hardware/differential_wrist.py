@@ -30,15 +30,15 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WristConfig:
     """Configuration for differential wrist."""
-    gear_ratio_j5: float = 27.3375  # Gear ratio for joint 5
-    gear_ratio_j6: float = 10.0     # Gear ratio for joint 6
+    gear_ratio_j5: float = 67.82    # Gear ratio for joint 5 / B axis
+    gear_ratio_j6: float = 67.82    # Gear ratio for joint 6 / C axis
     encoder_resolution: int = 16384  # Encoder counts per motor revolution
-    joint5_direction: int = -1       # Direction multiplier for joint 5
+    joint5_direction: int = 1        # Direction multiplier for joint 5
     joint6_direction: int = 1        # Direction multiplier for joint 6
     
-    # Joint ratio for direct rad to encoder conversion
-    # Based on Discord: 210000 converts rad to motor command
-    # where 0x4000 = 360 degrees rotation
+    # Legacy shared rad->encoder constant used in older experiments.
+    # Runtime conversion now uses the per-motor encoder factors derived
+    # from encoder_resolution * gear_ratio / (2*pi).
     joint_ratio: float = 210000.0
 
 
@@ -107,16 +107,16 @@ class DifferentialWrist:
         j5 = joint5_rad * self.config.joint5_direction
         j6 = joint6_rad * self.config.joint6_direction
         
-        # Differential inverse kinematics
-        # Based on Discord snippet:
-        # self.joints[4].move(-joint_positions[5] + joint_positions[4])
-        # self.joints[5].move(-joint_positions[5] - joint_positions[4])
-        motor_b_rad = -j6 + j5
-        motor_c_rad = -j6 - j5
-        
-        # Convert to encoder counts using joint ratio
-        motor_b_encoder = int(motor_b_rad * self.config.joint_ratio)
-        motor_c_encoder = int(motor_c_rad * self.config.joint_ratio)
+        # Differential inverse kinematics with per-motor scaling.
+        #
+        # Preserve the established Arctos sign convention:
+        #   B = -joint6 + joint5
+        #   C = -joint6 - joint5
+        #
+        # but convert each joint contribution with the motor that actually
+        # produces it instead of a shared hardcoded 210000 counts/rad factor.
+        motor_b_encoder = int((j5 * self._j5_factor) - (j6 * self._j6_factor))
+        motor_c_encoder = int((-j5 * self._j5_factor) - (j6 * self._j6_factor))
         
         logger.debug(
             f"joints_to_motors: J5={math.degrees(joint5_rad):.2f}°, "
@@ -146,16 +146,17 @@ class DifferentialWrist:
         Returns:
             Tuple of (joint5_rad, joint6_rad)
         """
-        # Convert encoder to radians
-        motor_b_rad = motor_b_encoder / self.config.joint_ratio
-        motor_c_rad = motor_c_encoder / self.config.joint_ratio
-        
-        # Differential forward kinematics
-        # Solving the inverse equations:
-        # B = -j6 + j5  →  j5 = (B - C) / 2
-        # C = -j6 - j5  →  j6 = -(B + C) / 2
-        j5 = (motor_b_rad - motor_c_rad) / 2
-        j6 = -(motor_b_rad + motor_c_rad) / 2
+        # Differential forward kinematics with per-motor scaling.
+        #
+        # From:
+        #   B_enc =  j5 * j5_factor - j6 * j6_factor
+        #   C_enc = -j5 * j5_factor - j6 * j6_factor
+        #
+        # Therefore:
+        #   j5 = (B_enc - C_enc) / (2 * j5_factor)
+        #   j6 = -(B_enc + C_enc) / (2 * j6_factor)
+        j5 = (motor_b_encoder - motor_c_encoder) / (2 * self._j5_factor)
+        j6 = -(motor_b_encoder + motor_c_encoder) / (2 * self._j6_factor)
         
         # Apply inverse direction multipliers
         joint5_rad = j5 / self.config.joint5_direction
@@ -188,8 +189,8 @@ class DifferentialWrist:
         j5 = joint5_vel * self.config.joint5_direction
         j6 = joint6_vel * self.config.joint6_direction
         
-        motor_b_vel = -j6 + j5
-        motor_c_vel = -j6 - j5
+        motor_b_vel = (j5 * self.config.gear_ratio_j5) - (j6 * self.config.gear_ratio_j6)
+        motor_c_vel = (-j5 * self.config.gear_ratio_j5) - (j6 * self.config.gear_ratio_j6)
         
         return motor_b_vel, motor_c_vel
     
@@ -208,8 +209,8 @@ class DifferentialWrist:
         Returns:
             Tuple of (joint5_vel, joint6_vel) in rad/s
         """
-        j5 = (motor_b_vel - motor_c_vel) / 2
-        j6 = -(motor_b_vel + motor_c_vel) / 2
+        j5 = (motor_b_vel - motor_c_vel) / (2 * self.config.gear_ratio_j5)
+        j6 = -(motor_b_vel + motor_c_vel) / (2 * self.config.gear_ratio_j6)
         
         joint5_vel = j5 / self.config.joint5_direction
         joint6_vel = j6 / self.config.joint6_direction

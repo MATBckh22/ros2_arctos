@@ -80,20 +80,6 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="jaw1">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['jaw1']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="jaw2">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['jaw2']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
         </ros2_control>
     </xacro:macro>
 </robot>

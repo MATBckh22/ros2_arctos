@@ -41,13 +41,13 @@ from std_srvs.srv import Trigger
 
 from arctos_hardware.arctos_controller import ArctosController, ArctosConfig
 from arctos_hardware.can_interface import default_can_device
-from arctos_hardware.homing import ArctosHoming
+from arctos_hardware.homing import ArctosHoming, ArctosHomingConfig
+from arctos_hardware.mks_servo import EndStopLevel
 
 logger = logging.getLogger(__name__)
 
 JOINT_NAMES = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6']
-JAW_NAMES = ['jaw1', 'jaw2']
-ALL_JOINT_NAMES = JOINT_NAMES + JAW_NAMES
+ALL_JOINT_NAMES = JOINT_NAMES
 
 
 class ArctosCanBridge(Node):
@@ -78,8 +78,14 @@ class ArctosCanBridge(Node):
         self.declare_parameter('state_publish_rate', 5.0)
         self.declare_parameter('command_send_rate', 10.0)
         self.declare_parameter('command_timeout', 0.5)
-        self.declare_parameter('active_joints', [1, 2, 3, 4])
-        self.declare_parameter('state_joint_signs', [1.0, 1.0, -1.0, 1.0, 1.0, 1.0])
+        self.declare_parameter('active_joints', [1, 2, 3, 4, 5, 6])
+        self.declare_parameter('state_joint_signs', [1.0, 1.0, -1.0, 1.0, -1.0, 1.0])
+        self.declare_parameter('enforce_limit_switch_stop', True)
+        self.declare_parameter('validate_position_commands', False)
+        self.declare_parameter('enforce_stall_stop', True)
+        self.declare_parameter('stall_error_deg', 4.0)
+        self.declare_parameter('stall_progress_deg', 0.25)
+        self.declare_parameter('stall_timeout_s', 0.8)
 
         can_device = self.get_parameter('can_device').value
         can_bitrate = self.get_parameter('can_bitrate').value
@@ -89,9 +95,17 @@ class ArctosCanBridge(Node):
         self._cmd_timeout = self.get_parameter('command_timeout').value
         active_joints_param = self.get_parameter('active_joints').value
         state_joint_signs = self.get_parameter('state_joint_signs').value
+        self._enforce_limit_switch_stop = self.get_parameter('enforce_limit_switch_stop').value
+        self._validate_position_commands = self.get_parameter('validate_position_commands').value
+        self._enforce_stall_stop = self.get_parameter('enforce_stall_stop').value
+        self._stall_error_rad = math.radians(self.get_parameter('stall_error_deg').value)
+        self._stall_progress_rad = math.radians(self.get_parameter('stall_progress_deg').value)
+        self._stall_timeout_s = self.get_parameter('stall_timeout_s').value
 
         self._active_indices = [j - 1 for j in active_joints_param]
         self._state_joint_signs = [float(v) for v in state_joint_signs]
+        self._homing_config = ArctosHomingConfig()
+        self._limit_motor_ids = list(active_joints_param)
 
         config = ArctosConfig(
             can_device=can_device,
@@ -109,12 +123,23 @@ class ArctosCanBridge(Node):
         self._pending_cmd = None
         self._motors_enabled = False
         self._watchdog_triggered = False
+        self._limit_tripped = False
+        self._stall_tripped = False
         self._control_paused = False  # Paused during homing/reconnect
         self._warned_inactive_joints = set()
+        self._last_limit_states = {motor_id: None for motor_id in self._limit_motor_ids}
+        self._last_limit_warn_time = 0.0
+        self._last_command_log_time = 0.0
+        self._last_send_log_time = 0.0
+        self._last_state_positions = None
+        self._stall_started_at = None
 
-        # Callback groups: services run on a separate thread so they don't
-        # block the control loop timer (and vice versa).
-        self._timer_cb_group = MutuallyExclusiveCallbackGroup()
+        # Keep read/write timers on separate executor lanes. Actual CAN access
+        # is serialized with the controller lock so command streaming doesn't
+        # get starved behind the slower state-read loop.
+        self._state_cb_group = MutuallyExclusiveCallbackGroup()
+        self._command_cb_group = MutuallyExclusiveCallbackGroup()
+        self._watchdog_cb_group = MutuallyExclusiveCallbackGroup()
         self._service_cb_group = MutuallyExclusiveCallbackGroup()
 
         state_qos = QoSProfile(
@@ -191,20 +216,30 @@ class ArctosCanBridge(Node):
 
         self._state_timer = self.create_timer(
             1.0 / self._state_rate, self._state_loop,
-            callback_group=self._timer_cb_group,
+            callback_group=self._state_cb_group,
         )
         self._command_timer = self.create_timer(
             1.0 / self._command_rate, self._command_loop,
-            callback_group=self._timer_cb_group,
+            callback_group=self._command_cb_group,
         )
         self._watchdog_timer = self.create_timer(
             0.1, self._check_watchdog,
-            callback_group=self._timer_cb_group,
+            callback_group=self._watchdog_cb_group,
         )
 
     def _on_joint_command(self, msg: JointState):
         """Store latest command without blocking (no CAN I/O here)."""
         if not self._motors_enabled:
+            return
+
+        if self._limit_tripped or self._stall_tripped:
+            now = time.monotonic()
+            if now - self._last_limit_warn_time > 1.0:
+                self.get_logger().warn(
+                    'Ignoring command while a safety stop is latched; '
+                    'inspect the robot and call /arctos/enable_motors'
+                )
+                self._last_limit_warn_time = now
             return
 
         name_to_pos = {}
@@ -237,8 +272,19 @@ class ArctosCanBridge(Node):
                     self._warned_inactive_joints.add(jname)
 
             if changed:
-                if self.controller.validate_positions(target):
+                if (not self._validate_position_commands) or self.controller.validate_positions(target):
                     self._pending_cmd = target
+                    now = time.monotonic()
+                    if now - self._last_command_log_time > 1.0:
+                        max_delta_deg = max(
+                            abs(math.degrees(a - b))
+                            for a, b in zip(target, self._last_cmd_positions)
+                        )
+                        self.get_logger().info(
+                            f'Queued joint command from ros2_control '
+                            f'(max delta {max_delta_deg:.2f} deg)'
+                        )
+                        self._last_command_log_time = now
                 else:
                     self.get_logger().warn('Position command rejected: out of limits')
 
@@ -257,6 +303,8 @@ class ArctosCanBridge(Node):
         RViz visualization doesn't jump.
         """
         positions = list(self._last_known_positions)
+        encoder_values = [None] * len(JOINT_NAMES)
+
         for i in self._active_indices:
             servo = self.controller.servos[i]
             if servo is None:
@@ -264,10 +312,32 @@ class ArctosCanBridge(Node):
             try:
                 enc = servo.read_encoder_value()
                 if enc is not None:
-                    positions[i] = self.controller.encoder_to_angle(enc, i)
+                    encoder_values[i] = enc
             except Exception:
                 pass  # keep last known value
             time.sleep(0.005)
+
+        for i in range(4):
+            if encoder_values[i] is not None:
+                positions[i] = self.controller.encoder_to_angle(encoder_values[i], i)
+
+        wrist_coupled = (
+            self.controller.config.coupled_axis_mode and
+            4 in self._active_indices and
+            5 in self._active_indices
+        )
+        if wrist_coupled:
+            wrist_b = encoder_values[4]
+            wrist_c = encoder_values[5]
+            if wrist_b is not None and wrist_c is not None:
+                positions[4], positions[5] = self.controller.wrist.motors_to_joints(
+                    wrist_b, wrist_c
+                )
+        else:
+            for i in (4, 5):
+                if encoder_values[i] is not None:
+                    positions[i] = self.controller.encoder_to_angle(encoder_values[i], i)
+
         self._last_known_positions = positions
         return positions
 
@@ -279,25 +349,144 @@ class ArctosCanBridge(Node):
                 corrected[i] *= sign
         return corrected
 
+    def _get_limit_config(self, motor_id):
+        """Return homing/limit config for a motor ID."""
+        if motor_id in self._homing_config.joint_configs:
+            return self._homing_config.joint_configs[motor_id]
+        if motor_id == self._homing_config.wrist_b_config.motor_id:
+            return self._homing_config.wrist_b_config
+        if motor_id == self._homing_config.wrist_c_config.motor_id:
+            return self._homing_config.wrist_c_config
+        return None
+
+    def _limit_active_from_io(self, motor_id, io_status):
+        """Decode the configured limit input/polarity from an IO status byte."""
+        cfg = self._get_limit_config(motor_id)
+        if cfg is None or io_status is None:
+            return None
+
+        if cfg.limit_switch_input not in (1, 2):
+            return None
+
+        input_mask = 1 << (cfg.limit_switch_input - 1)
+        input_active = (io_status & input_mask) != 0
+        return (not input_active) if cfg.trigger_level == EndStopLevel.LOW else input_active
+
+    def _read_limit_states_sequential(self):
+        """Read all configured limit switches sequentially to avoid CAN collisions."""
+        states = dict(self._last_limit_states)
+        for motor_id in self._limit_motor_ids:
+            servo = self.controller.servos[motor_id - 1]
+            if servo is None:
+                continue
+            try:
+                io_status = servo.read_io_status()
+                states[motor_id] = self._limit_active_from_io(motor_id, io_status)
+            except Exception:
+                states[motor_id] = None
+            time.sleep(0.005)
+        self._last_limit_states = states
+        return states
+
+    def _handle_limit_trip(self, limit_states):
+        """Stop motion and latch the bridge if any configured limit is active."""
+        active_limits = [motor_id for motor_id, active in limit_states.items() if active is True]
+        if not active_limits:
+            return
+        if self._limit_tripped:
+            return
+
+        self.get_logger().error(
+            f'Limit switch triggered on motor(s) {active_limits}; stopping motion'
+        )
+        self.controller.stop_all()
+        with self._lock:
+            self._pending_cmd = None
+            self._last_sent_cmd_positions = list(self._last_cmd_positions)
+        self._motors_enabled = False
+        self._limit_tripped = True
+        self._stall_started_at = None
+
+    def _handle_motion_stall(self, positions):
+        """Latch the bridge if commands continue but the robot stops making progress."""
+        if not self._enforce_stall_stop or self._stall_tripped or self._limit_tripped:
+            self._last_state_positions = list(positions)
+            return
+
+        with self._lock:
+            commanded = list(self._last_cmd_positions)
+            last_cmd_time = self._last_cmd_time
+
+        now = time.monotonic()
+        if now - last_cmd_time > self._cmd_timeout:
+            self._stall_started_at = None
+            self._last_state_positions = list(positions)
+            return
+
+        max_error = max(
+            abs(commanded[i] - positions[i]) for i in self._active_indices
+        )
+        if max_error < self._stall_error_rad:
+            self._stall_started_at = None
+            self._last_state_positions = list(positions)
+            return
+
+        if self._last_state_positions is None:
+            self._last_state_positions = list(positions)
+            return
+
+        max_progress = max(
+            abs(positions[i] - self._last_state_positions[i]) for i in self._active_indices
+        )
+        self._last_state_positions = list(positions)
+
+        if max_progress > self._stall_progress_rad:
+            self._stall_started_at = None
+            return
+
+        if self._stall_started_at is None:
+            self._stall_started_at = now
+            return
+
+        if now - self._stall_started_at < self._stall_timeout_s:
+            return
+
+        max_error_deg = math.degrees(max_error)
+        self.get_logger().error(
+            f'Motion stall detected (max error {max_error_deg:.2f} deg); stopping motion'
+        )
+        self.controller.stop_all()
+        with self._lock:
+            self._pending_cmd = None
+            self._last_sent_cmd_positions = list(self._last_cmd_positions)
+        self._motors_enabled = False
+        self._stall_tripped = True
+        self._stall_started_at = None
+
     def _state_loop(self):
         """Read and publish state at a conservative CAN-safe rate."""
         if self._control_paused:
             return
 
         try:
-            self.controller.can.flush()
-        except Exception:
-            pass
-        time.sleep(0.005)
+            with self.controller._lock:
+                try:
+                    self.controller.can.flush()
+                except Exception:
+                    pass
+                time.sleep(0.005)
 
-        try:
-            positions = self._read_positions_sequential()
-            ros_positions = self._positions_for_ros_state(positions)
+                positions = self._read_positions_sequential()
+                if self._enforce_limit_switch_stop:
+                    limit_states = self._read_limit_states_sequential()
+                    self._handle_limit_trip(limit_states)
+                self._handle_motion_stall(positions)
+                ros_positions = self._positions_for_ros_state(positions)
 
             msg = JointState()
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.name = list(ALL_JOINT_NAMES)
-            msg.position = list(ros_positions) + [0.0, 0.0]
+            msg.position = list(ros_positions)
             msg.velocity = [0.0] * len(ALL_JOINT_NAMES)
             msg.effort = []
 
@@ -307,7 +496,7 @@ class ArctosCanBridge(Node):
 
     def _command_loop(self):
         """Send the latest trajectory command at a smoother rate than state reads."""
-        if self._control_paused or not self._motors_enabled:
+        if self._control_paused or not self._motors_enabled or self._limit_tripped or self._stall_tripped:
             return
 
         with self._lock:
@@ -327,12 +516,16 @@ class ArctosCanBridge(Node):
             with self._lock:
                 self._last_cmd_positions = cmd
                 self._last_sent_cmd_positions = list(cmd)
+            now = time.monotonic()
+            if now - self._last_send_log_time > 1.0:
+                self.get_logger().info('Sent joint command to CAN bus')
+                self._last_send_log_time = now
         except Exception as e:
             self.get_logger().warn(f'Failed to send joint command: {e}')
 
     def _check_watchdog(self):
         """Disable motors if no command received within timeout."""
-        if not self._motors_enabled or self._watchdog_triggered:
+        if not self._motors_enabled or self._watchdog_triggered or self._limit_tripped or self._stall_tripped:
             return
 
         elapsed = time.monotonic() - self._last_cmd_time
@@ -356,9 +549,19 @@ class ArctosCanBridge(Node):
     def _handle_enable(self, request, response):
         """Re-enable motors after e-stop."""
         self.get_logger().info('Motor enable requested')
+        if self._enforce_limit_switch_stop:
+            limit_states = self._read_limit_states_sequential()
+            active_limits = [motor_id for motor_id, active in limit_states.items() if active is True]
+            if active_limits:
+                response.success = False
+                response.message = f'Limit switch still active on motor(s) {active_limits}'
+                return response
         self.controller.enable_motors()
         self._motors_enabled = True
         self._watchdog_triggered = False
+        self._limit_tripped = False
+        self._stall_tripped = False
+        self._stall_started_at = None
         self._last_cmd_time = time.monotonic()
         response.success = True
         response.message = 'Motors enabled'
@@ -381,9 +584,9 @@ class ArctosCanBridge(Node):
     def _handle_home_all(self, request, response):
         """Execute homing sequence for active joints only.
 
-        When active_joints=[1,2,3,4] (the default), this homes only the
-        standard joints and skips the differential wrist (J5-6).  Full
-        home_all() is only called when all six joints are active.
+        When all six joints are active, this executes full standard+wrist
+        homing. If a reduced joint set is configured, the wrist homing is
+        skipped automatically.
         """
         self.get_logger().info('Homing request received — pausing control loop')
 
@@ -430,6 +633,9 @@ class ArctosCanBridge(Node):
             self.controller.enable_motors()
             self._motors_enabled = True
             self._watchdog_triggered = False
+            self._limit_tripped = False
+            self._stall_tripped = False
+            self._stall_started_at = None
             self._last_cmd_time = time.monotonic()
             self._control_paused = False
             self.get_logger().info('Control loop resumed')
@@ -477,6 +683,9 @@ class ArctosCanBridge(Node):
             if self.controller.connect():
                 self.controller.enable_motors()
                 self._motors_enabled = True
+                self._limit_tripped = False
+                self._stall_tripped = False
+                self._stall_started_at = None
                 self._last_cmd_time = time.monotonic()
                 positions = self.controller.read_joint_positions()
                 with self._lock:

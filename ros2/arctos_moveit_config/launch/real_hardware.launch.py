@@ -19,6 +19,7 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
+import yaml
 
 HW_PLUGIN = "joint_state_topic_hardware_interface/JointStateTopicSystem"
 CMD_TOPIC = "/arctos/joint_commands"
@@ -69,8 +70,13 @@ def generate_launch_description():
     ros2_controllers_yaml = os.path.join(
         moveit_config_pkg, "config", "ros2_controllers_real.yaml"
     )
+    moveit_controllers_real_yaml = os.path.join(
+        moveit_config_pkg, "config", "moveit_controllers_real.yaml"
+    )
 
     moveit_dict = moveit_config.to_dict()
+    with open(moveit_controllers_real_yaml, 'r', encoding='utf-8') as f:
+        moveit_dict.update(yaml.safe_load(f))
     trajectory_execution = {
         "trajectory_execution.allowed_execution_duration_scaling": 4.0,
         "trajectory_execution.allowed_goal_duration_margin": 2.0,
@@ -107,13 +113,6 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["arctos_arm_controller"],
-        output="screen",
-    )
-
-    gripper_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["gripper_controller"],
         output="screen",
     )
 
@@ -155,7 +154,8 @@ def generate_launch_description():
             "state_publish_rate": 5.0,
             "command_send_rate": 50.0,
             "command_timeout": 2.0,
-            "active_joints": [1, 2, 3, 4],
+            "active_joints": [1, 2, 3, 4, 5, 6],
+            "state_joint_signs": [1.0, 1.0, -1.0, 1.0, -1.0, 1.0],
         }],
     )
 
@@ -164,7 +164,6 @@ def generate_launch_description():
         actions=[
             joint_state_broadcaster_spawner,
             arm_controller_spawner,
-            gripper_controller_spawner,
         ],
     )
 

@@ -85,13 +85,6 @@ def generate_launch_description():
         output="screen",
     )
 
-    gripper_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["gripper_controller"],
-        output="screen",
-    )
-
     moveit_dict.update(trajectory_execution)
 
     move_group_node = Node(
@@ -130,7 +123,6 @@ def generate_launch_description():
         actions=[
             joint_state_broadcaster_spawner,
             arm_controller_spawner,
-            gripper_controller_spawner,
         ],
     )
 

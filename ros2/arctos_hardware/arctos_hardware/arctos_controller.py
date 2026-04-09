@@ -54,9 +54,9 @@ class ArctosConfig:
                    min_limit=-math.pi*3/4, max_limit=math.pi*3/4),
         JointConfig(motor_id=4, gear_ratio=48.0, direction=1,
                    min_limit=-math.pi, max_limit=math.pi),
-        JointConfig(motor_id=5, gear_ratio=27.3375, direction=-1,
+        JointConfig(motor_id=5, gear_ratio=67.82, direction=1,
                    min_limit=-math.pi/2, max_limit=math.pi/2),
-        JointConfig(motor_id=6, gear_ratio=10.0, direction=1,
+        JointConfig(motor_id=6, gear_ratio=67.82, direction=1,
                    min_limit=-math.pi, max_limit=math.pi),
     ])
     
@@ -64,10 +64,10 @@ class ArctosConfig:
     default_speed_rpm: int = 500
     default_acceleration: int = 150
     default_joint_speeds_rpm: List[int] = field(
-        default_factory=lambda: [120, 500, 500, 500, 500, 500]
+        default_factory=lambda: [120, 500, 500, 500, 80, 80]
     )
     default_joint_accelerations: List[int] = field(
-        default_factory=lambda: [40, 150, 150, 150, 150, 150]
+        default_factory=lambda: [40, 150, 150, 150, 30, 30]
     )
     command_spacing_s: float = 0.02
     command_spacing_no_ack_s: float = 0.002

@@ -136,25 +136,13 @@
         <mu2>0.2</mu2>
         <selfCollide>true</selfCollide>
     </gazebo>
-    <gazebo reference="Gripper_1">
+    <gazebo reference="C_Core_Suction">
         <material>Gazebo/Silver</material>
         <mu1>0.2</mu1>
         <mu2>0.2</mu2>
         <selfCollide>true</selfCollide>
     </gazebo>
     <gazebo reference="Link_6_1">
-        <material>Gazebo/Silver</material>
-        <mu1>0.2</mu1>
-        <mu2>0.2</mu2>
-        <selfCollide>true</selfCollide>
-    </gazebo>
-    <gazebo reference="Left_jaw_1">
-        <material>Gazebo/Silver</material>
-        <mu1>0.2</mu1>
-        <mu2>0.2</mu2>
-        <selfCollide>true</selfCollide>
-    </gazebo>
-    <gazebo reference="Right_jaw_1">
         <material>Gazebo/Silver</material>
         <mu1>0.2</mu1>
         <mu2>0.2</mu2>
@@ -292,7 +280,7 @@
             </geometry>
         </collision>
     </link>
-    <link name="Gripper_1">
+    <link name="C_Core_Suction">
         
 <inertial>
             <origin rpy="0 0 0" xyz="0.0036112727264542635 -0.014760653808445767 -0.00103677815369696" />
@@ -301,16 +289,16 @@
         </inertial>
 
         <visual>
-            <origin rpy="0 0 0" xyz="-0.000193 0.319847 -0.570316" />
+            <origin rpy="0 0 0" xyz="-0.000429 -0.008602 -0.624470" />
             <geometry>
-                <mesh filename="package://arctos_urdf_description/meshes/Gripper_1.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="package://arctos_urdf_description/meshes/C Core Suction.stl" scale="0.001 0.001 0.001" />
             </geometry>
             <material name="paint_metallic_blue_2" />
         </visual>
         <collision>
-            <origin rpy="0 0 0" xyz="0 -0.015 0" />
+            <origin rpy="0 0 0" xyz="-0.000429 -0.008602 -0.624470" />
             <geometry>
-                <box size="0.05 0.03 0.05"/>
+                <mesh filename="package://arctos_urdf_description/meshes/C Core Suction.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -333,50 +321,6 @@
             <origin rpy="0 0 0" xyz="0 0 0" />
             <geometry>
                 <cylinder radius="0.025" length="0.01"/>
-            </geometry>
-        </collision>
-    </link>
-    <link name="Left_jaw_1">
-        
-<inertial>
-            <origin rpy="0 0 0" xyz="-0.011142702480351952 -0.009692440309284511 -0.009385792627785827" />
-            <mass value="0.07369602565859415" />
-            <inertia ixx="1.1e-05" ixy="2e-06" ixz="-0.0" iyy="6e-06" iyz="-0.0" izz="1.4e-05" />
-        </inertial>
-
-        <visual>
-            <origin rpy="0 0 0" xyz="-0.007934 0.359845 -0.599867" />
-            <geometry>
-                <mesh filename="package://arctos_urdf_description/meshes/Left_jaw_1.stl" scale="0.001 0.001 0.001" />
-            </geometry>
-            <material name="paint_metallic_blue_2" />
-        </visual>
-        <collision>
-            <origin rpy="0 0 0" xyz="-0.01 -0.01 -0.01" />
-            <geometry>
-                <box size="0.025 0.02 0.02"/>
-            </geometry>
-        </collision>
-    </link>
-    <link name="Right_jaw_1">
-        
-<inertial>
-            <origin rpy="0 0 0" xyz="-0.008289104952972526 -0.009768535307719373 0.009395511902715814" />
-            <mass value="0.07312902168719511" />
-            <inertia ixx="1.1e-05" ixy="-1e-06" ixz="-1e-06" iyy="6e-06" iyz="0.0" izz="1.4e-05" />
-        </inertial>
-
-        <visual>
-            <origin rpy="0 0 0" xyz="-0.007934 0.359845 -0.539867" />
-            <geometry>
-                <mesh filename="package://arctos_urdf_description/meshes/Right_jaw_1.stl" scale="0.001 0.001 0.001" />
-            </geometry>
-            <material name="paint_metallic_blue_2" />
-        </visual>
-        <collision>
-            <origin rpy="0 0 0" xyz="-0.01 -0.01 0.01" />
-            <geometry>
-                <box size="0.025 0.02 0.02"/>
             </geometry>
         </collision>
     </link>
@@ -404,36 +348,24 @@
         <child link="Link_4_1" />
         <axis xyz="-0.0 1.0 -0.0" />
     </joint>
-    <joint name="joint5" type="continuous">
+    <joint name="joint5" type="revolute">
         <origin rpy="0 0 0" xyz="-0.039012 -0.121187 -0.001774" />
         <parent link="Link_4_1" />
         <child link="Link_5_1" />
         <axis xyz="-1.0 -0.0 0.0" />
+        <limit effort="100" lower="-1.57079632679" upper="1.57079632679" velocity="2.0" />
     </joint>
-    <joint name="gripper" type="fixed">
+    <joint name="suction_tool" type="fixed">
         <origin rpy="0 0 0" xyz="0.0 -0.006085 0.0" />
         <parent link="Link_6_1" />
-        <child link="Gripper_1" />
+        <child link="C_Core_Suction" />
     </joint>
-    <joint name="joint6" type="continuous">
+    <joint name="joint6" type="revolute">
         <origin rpy="0 0 0" xyz="0.039204 -0.033835 0.0" />
         <parent link="Link_5_1" />
         <child link="Link_6_1" />
         <axis xyz="-0.0 1.0 -0.0" />
-    </joint>
-    <joint name="jaw1" type="prismatic">
-        <origin rpy="0 0 0" xyz="0.007741 -0.039998 0.029551" />
-        <parent link="Gripper_1" />
-        <child link="Left_jaw_1" />
-        <axis xyz="-0.0 0.0 -1.0" />
-        <limit effort="100" lower="0.0" upper="0.015" velocity="100" />
-    </joint>
-    <joint name="jaw2" type="prismatic">
-        <origin rpy="0 0 0" xyz="0.007741 -0.039998 -0.030449" />
-        <parent link="Gripper_1" />
-        <child link="Right_jaw_1" />
-        <axis xyz="0.0 -0.0 1.0" />
-        <limit effort="100" lower="0.0" upper="0.015" velocity="100" />
+        <limit effort="100" lower="-3.14159265359" upper="3.14159265359" velocity="2.0" />
     </joint>
     <transmission name="trans_joint1">
         <type>transmission_interface/SimpleTransmission</type>
@@ -495,26 +427,6 @@
             <mechanicalReduction>1</mechanicalReduction>
         </actuator>
     </transmission>
-    <transmission name="trans_jaw1">
-        <type>transmission_interface/SimpleTransmission</type>
-        <joint name="jaw1">
-            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-        </joint>
-        <actuator name="jaw1_motor">
-            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-            <mechanicalReduction>1</mechanicalReduction>
-        </actuator>
-    </transmission>
-    <transmission name="trans_jaw2">
-        <type>transmission_interface/SimpleTransmission</type>
-        <joint name="jaw2">
-            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-        </joint>
-        <actuator name="jaw2_motor">
-            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-            <mechanicalReduction>1</mechanicalReduction>
-        </actuator>
-    </transmission>
     <gazebo>
         <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
             <robotNamespace>/</robotNamespace>
@@ -556,16 +468,6 @@
             <state_interface name="velocity"/>
         </joint>
         <joint name="joint6">
-            <command_interface name="position"/>
-            <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
-            <state_interface name="velocity"/>
-        </joint>
-        <joint name="jaw1">
-            <command_interface name="position"/>
-            <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
-            <state_interface name="velocity"/>
-        </joint>
-        <joint name="jaw2">
             <command_interface name="position"/>
             <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
             <state_interface name="velocity"/>

@@ -113,8 +113,8 @@ class ArctosHomingConfig:
         2: 150.0,
         3: 150.0,
         4: 48.0,
-        5: 27.3375,
-        6: 10.0,
+        5: 67.82,
+        6: 67.82,
     })
     
     # Standard joints (1-4) configurations

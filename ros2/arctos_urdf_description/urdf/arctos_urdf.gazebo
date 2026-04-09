@@ -49,7 +49,7 @@
   <selfCollide>true</selfCollide>
 </gazebo>
 
-<gazebo reference="Gripper_1">
+<gazebo reference="C_Core_Suction">
   <material>${body_color}</material>
   <mu1>0.2</mu1>
   <mu2>0.2</mu2>
@@ -57,20 +57,6 @@
 </gazebo>
 
 <gazebo reference="Link_6_1">
-  <material>${body_color}</material>
-  <mu1>0.2</mu1>
-  <mu2>0.2</mu2>
-  <selfCollide>true</selfCollide>
-</gazebo>
-
-<gazebo reference="Left_jaw_1">
-  <material>${body_color}</material>
-  <mu1>0.2</mu1>
-  <mu2>0.2</mu2>
-  <selfCollide>true</selfCollide>
-</gazebo>
-
-<gazebo reference="Right_jaw_1">
   <material>${body_color}</material>
   <mu1>0.2</mu1>
   <mu2>0.2</mu2>

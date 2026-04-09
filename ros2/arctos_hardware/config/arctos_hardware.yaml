@@ -37,8 +37,8 @@ arctos_hardware_node:
       joint2: 150.0
       joint3: 150.0
       joint4: 48.0
-      joint5: 27.3375
-      joint6: 10.0
+      joint5: 67.82
+      joint6: 67.82
     
     # Joint Limits (radians)
     joint_limits:
