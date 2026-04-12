@@ -25,6 +25,7 @@ install(PROGRAMS
   scripts/arctos_hardware_interface.py
   scripts/arctos_can_bridge.py
   scripts/can_timing_audit.py
+  scripts/suction_driver.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

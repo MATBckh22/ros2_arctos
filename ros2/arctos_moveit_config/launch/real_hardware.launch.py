@@ -159,6 +159,19 @@ def generate_launch_description():
         }],
     )
 
+    suction_driver_node = Node(
+        package="arctos_hardware",
+        executable="suction_driver.py",
+        name="suction_driver",
+        output="screen",
+        parameters=[{
+            "can_device": LaunchConfiguration("can_device"),
+            "default_pump_pwm": 200,
+            "status_poll_rate": 2.0,
+            "watchdog_timeout_100ms": 10,
+        }],
+    )
+
     delayed_spawners = TimerAction(
         period=2.0,
         actions=[
@@ -179,6 +192,7 @@ def generate_launch_description():
         robot_state_publisher,
         ros2_control_node,
         can_bridge_node,
+        suction_driver_node,
         delayed_spawners,
         delayed_move_group,
         rviz_node,
