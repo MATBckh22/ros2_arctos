@@ -11,7 +11,7 @@ arctos_hardware_node:
     publish_rate: 50.0           # Joint state publish rate (Hz)
     
     # Motor Configuration
-    coupled_axis_mode: true      # Enable differential wrist coupling (J5/J6)
+    coupled_axis_mode: true      # Differential wrist: B and C drive j5/j6 together
     auto_enable: true            # Auto-enable motors on startup
     
     # Safety Limits
@@ -37,8 +37,8 @@ arctos_hardware_node:
       joint2: 150.0
       joint3: 150.0
       joint4: 48.0
-      joint5: 67.82
-      joint6: 67.82
+      joint5: 27.3375
+      joint6: 15.0
     
     # Joint Limits (radians)
     joint_limits:

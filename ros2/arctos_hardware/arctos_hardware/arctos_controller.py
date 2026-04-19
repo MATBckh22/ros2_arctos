@@ -54,9 +54,9 @@ class ArctosConfig:
                    min_limit=-math.pi*3/4, max_limit=math.pi*3/4),
         JointConfig(motor_id=4, gear_ratio=48.0, direction=1,
                    min_limit=-math.pi, max_limit=math.pi),
-        JointConfig(motor_id=5, gear_ratio=67.82, direction=1,
+        JointConfig(motor_id=5, gear_ratio=27.3375, direction=1,
                    min_limit=-math.pi/2, max_limit=math.pi/2),
-        JointConfig(motor_id=6, gear_ratio=67.82, direction=1,
+        JointConfig(motor_id=6, gear_ratio=15.0, direction=1,
                    min_limit=-math.pi, max_limit=math.pi),
     ])
     
@@ -70,15 +70,10 @@ class ArctosConfig:
         default_factory=lambda: [40, 150, 150, 150, 30, 30]
     )
     command_spacing_s: float = 0.02
-    command_spacing_no_ack_s: float = 0.002
     command_retry_delay_s: float = 0.05
-    read_spacing_s: float = 0.005
     
-    # Enable coupled axis mode for differential wrist
     coupled_axis_mode: bool = True
     
-    # Wrist configuration
-    wrist_joint_ratio: float = 210000.0
 
 
 class ArctosController:
@@ -118,14 +113,13 @@ class ArctosController:
         # Servo instances
         self.servos: List[Optional[MksServo]] = []
         
-        # Differential wrist handler
+        # Differential wrist handler (active when coupled_axis_mode=True)
         wrist_config = WristConfig(
             gear_ratio_j5=self.config.joints[4].gear_ratio,
             gear_ratio_j6=self.config.joints[5].gear_ratio,
             encoder_resolution=self.config.encoder_resolution,
-            joint5_direction=self.config.joints[4].direction,
-            joint6_direction=self.config.joints[5].direction,
-            joint_ratio=self.config.wrist_joint_ratio
+            motor_b_direction=self.config.joints[4].direction,
+            motor_c_direction=self.config.joints[5].direction,
         )
         self.wrist = DifferentialWrist(wrist_config)
         
@@ -307,7 +301,6 @@ class ArctosController:
             for idx in active_indices:
                 value = self.servos[idx].read_encoder_value()
                 encoder_values[idx] = value or 0
-                time.sleep(self.config.read_spacing_s)
             
             # Convert joints 1-4 directly
             for i in range(4):
@@ -518,6 +511,12 @@ class ArctosController:
                 encoder_targets[4] = self.angle_to_encoder(positions[4], 4)
                 encoder_targets[5] = self.angle_to_encoder(positions[5], 5)
 
+            logger.debug(
+                f"[WRIST_CMD] j5={math.degrees(positions[4]):.2f}° "
+                f"j6={math.degrees(positions[5]):.2f}° → "
+                f"enc5={encoder_targets[4]} enc6={encoder_targets[5]}"
+            )
+
             for i in range(6):
                 servo = self.servos[i]
                 if servo is None:
@@ -528,7 +527,6 @@ class ArctosController:
                     accelerations[i],
                     wait_for_ack=False,
                 )
-                time.sleep(self.config.command_spacing_no_ack_s)
 
             self._commanded_positions = list(positions)
 

@@ -88,6 +88,25 @@ Visualization Manager:
         Show Robot Collision: false
         Show Robot Visual: true
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Suction State
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /suction/marker
+      Value: true
+    - Class: rviz_default_plugins/InteractiveMarkers
+      Enabled: true
+      Name: Suction Button
+      Enable Transparency: true
+      Interactive Markers Namespace: /suction_button
+      Show Axes: false
+      Show Descriptions: true
+      Show Visual Aids: false
+      Value: true
   Global Options:
     Background Color: 48; 48; 48
     Fixed Frame: base_link

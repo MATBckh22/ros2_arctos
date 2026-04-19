@@ -1,0 +1,8 @@
+placeholder: true
+width: 640
+height: 480
+fx: 615.0
+fy: 615.0
+cx: 320.0
+cy: 240.0
+depth_unit: mm

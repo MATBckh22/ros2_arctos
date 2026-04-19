@@ -1,0 +1,58 @@
+detector:
+  valid_zone_polygon_px:
+    - [120, 80]
+    - [520, 80]
+    - [520, 400]
+    - [120, 400]
+  morphology_kernel_size: 5
+  center_depth_window: 5
+  invalid_depth_fraction_threshold: 0.5
+  expected_book_area_px: 95000.0
+  expected_book_area_tolerance_ratio: 0.30
+  book_size_mm:
+    width_mm: 210.0
+    length_mm: 297.0
+  grip_target:
+    inset_x_mm: 8.0
+    inset_y_mm: 8.0
+    z_offset_mm: 0.0
+  confidence:
+    area_weight: 0.35
+    fill_weight: 0.25
+    depth_weight: 0.20
+    zone_weight: 0.20
+    zone_margin_normalizer_px: 40.0
+    minimum_confidence: 0.40
+  temporal:
+    frame_count: 10
+    min_valid_detections: 5
+    max_translation_spread_mm: 3.0
+    max_yaw_spread_deg: 2.0
+  isolation:
+    primary_method: depth
+    depth:
+      median_kernel_size: 5
+      min_depth_mm: 600
+      max_depth_mm: 630
+    hsv:
+      lower: [10, 30, 30]
+      upper: [40, 255, 255]
+    background:
+      reference_rgb_path: data/reference_empty/rgb.png
+      reference_depth_path: data/reference_empty/depth.png
+      rgb_threshold: 25
+      depth_threshold_mm: 5
+calibration:
+  intrinsics_path: config/camera_intrinsics.yaml
+  extrinsics_path: calibration/overhead_extrinsics.yaml
+capture:
+  default_output_dir: ~/maripad_data/book_dataset
+  default_frame_count: 20
+  stream:
+    width: 640
+    height: 480
+    fps: 30
+logging:
+  log_file: ~/.ros/log/maripad_perception/book_detector.log
+  max_bytes: 1048576
+  backup_count: 5

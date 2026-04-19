@@ -44,6 +44,13 @@ def generate_launch_description():
         ],
     )
 
+    suction_gripper_action_node = Node(
+        package="arctos_hardware",
+        executable="suction_gripper_action.py",
+        name="suction_gripper_action",
+        output="screen",
+    )
+
     return LaunchDescription(
         [
             can_device_arg,
@@ -51,5 +58,6 @@ def generate_launch_description():
             status_poll_rate_arg,
             watchdog_timeout_arg,
             suction_driver_node,
+            suction_gripper_action_node,
         ]
     )

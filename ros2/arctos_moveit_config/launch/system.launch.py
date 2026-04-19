@@ -45,6 +45,11 @@ def generate_launch_description():
         default_value='can0',
         description='CAN interface used in real-hardware modes'
     )
+    use_suction_arg = DeclareLaunchArgument(
+        'use_suction',
+        default_value='false',
+        description='Launch suction gripper nodes in real-hardware modes'
+    )
     use_rviz_arg = DeclareLaunchArgument(
         'use_rviz',
         default_value='true',
@@ -80,6 +85,7 @@ def generate_launch_description():
         condition=_mode_is('real', 'real_with_isaac'),
         launch_arguments={
             'can_device': LaunchConfiguration('can_device'),
+            'use_suction': LaunchConfiguration('use_suction'),
             'use_rviz': LaunchConfiguration('use_rviz'),
             'use_moveit': LaunchConfiguration('use_moveit'),
         }.items(),
@@ -104,6 +110,7 @@ def generate_launch_description():
     return LaunchDescription([
         mode_arg,
         can_device_arg,
+        use_suction_arg,
         use_rviz_arg,
         use_moveit_arg,
         bridge_rate_arg,

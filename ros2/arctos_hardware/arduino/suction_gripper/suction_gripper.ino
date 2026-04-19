@@ -27,7 +27,6 @@ static const int SERVO_ON  = 2500;
 // --- CAN config ---
 static const unsigned long CAN_ID       = 0x07;
 static const unsigned long CAN_BAUDRATE = CAN_500KBPS;
-static const int           CAN_CLOCK    = MCP_8MHZ;
 
 // --- Command opcodes (PC -> Arduino) ---
 static const uint8_t CMD_SET_SUCTION   = 0x01;
@@ -92,6 +91,21 @@ void send_status() {
         (uint8_t)(uptime_s & 0xFF),
     };
     send_response(payload, sizeof(payload));
+}
+
+bool init_can_controller() {
+    const uint8_t clocks[] = {MCP_8MHZ, MCP_16MHZ};
+    const char* labels[] = {"8MHz", "16MHz"};
+
+    for (uint8_t i = 0; i < 2; ++i) {
+        if (can.begin(MCP_ANY, CAN_BAUDRATE, clocks[i]) == CAN_OK) {
+            Serial.print(F("MCP2515 ready, CAN ID=7, 500kbps, clock="));
+            Serial.println(labels[i]);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // --- CAN message handler ---
@@ -164,20 +178,19 @@ void handle_can_message(unsigned long rx_id, uint8_t len, uint8_t* buf) {
 void setup() {
     pumpServo.attach(PIN_PUMP);
     valveServo.attach(PIN_VALVE);
-    pumpServo.writeMicroseconds(SERVO_OFF);
-    valveServo.writeMicroseconds(SERVO_OFF);
+    force_off();
 
     pinMode(PIN_CAN_INT, INPUT);
 
     Serial.begin(115200);
     Serial.println(F("Arctos Suction Gripper CAN Node"));
 
-    while (can.begin(MCP_ANY, CAN_BAUDRATE, CAN_CLOCK) != CAN_OK) {
-        Serial.println(F("MCP2515 init failed, retrying..."));
+    while (!init_can_controller()) {
+        force_off();
+        Serial.println(F("MCP2515 init failed on 8MHz and 16MHz, retrying..."));
         delay(500);
     }
     can.setMode(MCP_NORMAL);
-    Serial.println(F("MCP2515 ready, CAN ID=7, 500kbps"));
 
     boot_time = millis();
     last_cmd_time = millis();

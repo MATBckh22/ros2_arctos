@@ -7,16 +7,87 @@ Provides low-level CAN bus communication using python-can with either:
 """
 
 import can
+import re
 import time
 import threading
 import logging
 import platform
 import subprocess
 from typing import Optional, List, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SocketcanState:
+    """Snapshot of the kernel-side state of a socketcan interface."""
+
+    state: str = "UNKNOWN"  # e.g. ERROR-ACTIVE / ERROR-PASSIVE / BUS-OFF / STOPPED
+    restarts: int = 0
+    bus_errors: int = 0
+    tx_errors: int = 0
+    rx_errors: int = 0
+    raw: str = ""
+
+    @property
+    def is_bus_off(self) -> bool:
+        return self.state == "BUS-OFF"
+
+    @property
+    def is_degraded(self) -> bool:
+        return self.state in ("ERROR-PASSIVE", "ERROR-WARNING", "BUS-OFF", "STOPPED")
+
+
+_CAN_STATE_RE = re.compile(r"\bcan state (\S+)")
+_CAN_RESTARTS_RE = re.compile(r"restart-ms \d+\s+(\S*)\s*restarts (\d+)", re.DOTALL)
+_BUS_ERR_RE = re.compile(r"bus-error (\d+)")
+_TX_ERR_RE = re.compile(r"tx_errors? (\d+)", re.IGNORECASE)
+_RX_ERR_RE = re.compile(r"rx_errors? (\d+)", re.IGNORECASE)
+
+
+def query_socketcan_state(device: str) -> Optional[SocketcanState]:
+    """
+    Parse `ip -details -statistics link show <device>` for the kernel's CAN
+    state and error counters. Returns None if the tool is missing or the
+    interface is not a socketcan device.
+    """
+    try:
+        result = subprocess.run(
+            ["ip", "-details", "-statistics", "link", "show", device],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1.0,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        logger.debug(f"query_socketcan_state({device}) failed: {e}")
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    out = result.stdout
+    state_match = _CAN_STATE_RE.search(out)
+    if not state_match:
+        return None
+
+    snap = SocketcanState(state=state_match.group(1), raw=out)
+    for regex, attr in (
+        (_BUS_ERR_RE, "bus_errors"),
+        (_TX_ERR_RE, "tx_errors"),
+        (_RX_ERR_RE, "rx_errors"),
+    ):
+        m = regex.search(out)
+        if m:
+            setattr(snap, attr, int(m.group(1)))
+
+    # `restarts N` appears after `restart-ms M`
+    m = re.search(r"restart-ms \d+.*?restarts (\d+)", out, re.DOTALL)
+    if m:
+        snap.restarts = int(m.group(1))
+    return snap
 
 
 def default_can_device() -> str:
@@ -73,7 +144,7 @@ class CanInterface:
     """
     
     DEFAULT_BITRATE = 500000
-    DEFAULT_TIMEOUT = 0.5
+    DEFAULT_TIMEOUT = 0.2
     
     def __init__(
         self,
@@ -336,22 +407,30 @@ class CanInterface:
                 self._reconnect_bus(reason=f"receive error: {e}")
                 return None
 
+    def get_socketcan_state(self) -> Optional[SocketcanState]:
+        """Return kernel-side state for this socketcan interface (if applicable)."""
+        if self._interface != "socketcan":
+            return None
+        return query_socketcan_state(self.device)
+
     def _recover_transport(self, reopen_channel: bool = False) -> None:
         """
-        Recover the CAN transport after a timeout or transient backend glitch.
+        Recover the CAN transport after a transient backend glitch.
 
         For slcan, reset the serial buffers and optionally reopen the channel.
-        For socketcan, recreate the bus object instead.
+        For socketcan, do nothing on plain response timeouts: the kernel
+        handles bus-off via `restart-ms`, and tearing down our socket just
+        drops in-flight replies and turns one motor timeout into a cascade.
+        We only rebuild the socket on real transport failures, which
+        `send()`/`receive()` already do explicitly via `_reconnect_bus`.
         """
         if not self.is_connected:
             return
 
-        with self._lock:
-            if self._interface != "slcan":
-                if reopen_channel:
-                    self._reconnect_bus(reason="socketcan recovery")
-                return
+        if self._interface != "slcan":
+            return
 
+        with self._lock:
             try:
                 if hasattr(self._bus, "flush"):
                     self._bus.flush()
@@ -390,7 +469,7 @@ class CanInterface:
         response_length: int = 8,
         timeout: Optional[float] = None,
         add_crc: bool = True,
-        retries: int = 3
+        retries: int = 2
     ) -> Optional[bytes]:
         """
         Send a command and wait for response.
@@ -409,35 +488,44 @@ class CanInterface:
             Response data bytes, or None on failure
         """
         timeout = timeout if timeout is not None else self.timeout
-        
+
         for attempt in range(retries):
             try:
-                # Clear any pending messages
-                while self.receive(motor_id, timeout=0.01):
+                # Drain any stale frames addressed to this motor (typically
+                # the ACK from the last fire-and-forget move command) so the
+                # response we return is actually for THIS request.
+                while self.receive(motor_id, timeout=0.001):
                     pass
-                
-                # Send command
+
                 self.send(motor_id, data, add_crc=add_crc)
-                
-                # Wait for response
                 response = self.receive(motor_id, timeout=timeout)
-                
                 if response:
                     return response.data
-                    
+
                 logger.warning(f"No response from motor {motor_id}, attempt {attempt + 1}/{retries}")
-                self._recover_transport(reopen_channel=(attempt + 1) >= 2)
-                
+                # On plain response timeouts, do NOT recreate the socket;
+                # the kernel handles bus-off via restart-ms, and tearing the
+                # socket down drops in-flight replies for other motors.
+                self._recover_transport(reopen_channel=False)
+
             except CanError as e:
                 logger.warning(f"CAN error on attempt {attempt + 1}: {e}")
                 self._recover_transport(reopen_channel=True)
             except Exception as e:
                 logger.warning(f"Unexpected CAN transport error on attempt {attempt + 1}: {e}")
                 self._recover_transport(reopen_channel=True)
-                
-            time.sleep(0.05)
-        
-        logger.error(f"Failed to get response from motor {motor_id} after {retries} attempts")
+
+        state = self.get_socketcan_state()
+        if state is not None:
+            logger.error(
+                f"Failed to get response from motor {motor_id} after {retries} attempts; "
+                f"bus state={state.state} restarts={state.restarts} "
+                f"bus_errors={state.bus_errors} tx_err={state.tx_errors} rx_err={state.rx_errors}"
+            )
+        else:
+            logger.error(
+                f"Failed to get response from motor {motor_id} after {retries} attempts"
+            )
         return None
     
     def flush(self) -> None:

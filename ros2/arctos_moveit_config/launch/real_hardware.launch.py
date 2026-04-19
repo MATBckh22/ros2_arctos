@@ -31,6 +31,10 @@ def generate_launch_description():
         'can_device', default_value='can0',
         description='CAN interface device name'
     )
+    use_suction_arg = DeclareLaunchArgument(
+        'use_suction', default_value='false',
+        description='Launch suction gripper nodes on CAN ID 7'
+    )
     use_rviz_arg = DeclareLaunchArgument(
         'use_rviz', default_value='true',
         description='Launch RViz'
@@ -49,6 +53,7 @@ def generate_launch_description():
             " hardware_plugin:=", HW_PLUGIN,
             " joint_commands_topic:=", CMD_TOPIC,
             " joint_states_topic:=", STATE_TOPIC,
+            " trigger_joint_command_threshold:=-1.0",
         ]),
         value_type=str,
     )
@@ -151,11 +156,13 @@ def generate_launch_description():
             "can_device": LaunchConfiguration("can_device"),
             "can_bitrate": 500000,
             "coupled_axis_mode": True,
-            "state_publish_rate": 5.0,
-            "command_send_rate": 50.0,
+            "state_publish_rate": 10.0,
             "command_timeout": 2.0,
+            "enforce_limit_switch_stop": False,
+            "enforce_stall_stop": False,
             "active_joints": [1, 2, 3, 4, 5, 6],
-            "state_joint_signs": [1.0, 1.0, -1.0, 1.0, -1.0, 1.0],
+            "state_joint_signs": [1.0, 1.0, -1.0, 1.0, -1.0, -1.0],
+            "command_joint_signs": [1.0, 1.0, 1.0, 1.0, 1.0, -1.0],
         }],
     )
 
@@ -170,6 +177,30 @@ def generate_launch_description():
             "status_poll_rate": 2.0,
             "watchdog_timeout_100ms": 10,
         }],
+    )
+
+    suction_gripper_action_node = Node(
+        package="arctos_hardware",
+        executable="suction_gripper_action.py",
+        name="suction_gripper_action",
+        output="screen",
+    )
+
+    suction_rviz_button_node = Node(
+        package="arctos_hardware",
+        executable="suction_rviz_button.py",
+        name="suction_rviz_button",
+        output="screen",
+    )
+
+    delayed_suction = TimerAction(
+        period=8.0,
+        actions=[
+            suction_driver_node,
+            suction_gripper_action_node,
+            suction_rviz_button_node,
+        ],
+        condition=IfCondition(LaunchConfiguration("use_suction")),
     )
 
     delayed_spawners = TimerAction(
@@ -187,12 +218,13 @@ def generate_launch_description():
 
     return LaunchDescription([
         can_device_arg,
+        use_suction_arg,
         use_rviz_arg,
         use_moveit_arg,
         robot_state_publisher,
         ros2_control_node,
         can_bridge_node,
-        suction_driver_node,
+        delayed_suction,
         delayed_spawners,
         delayed_move_group,
         rviz_node,
